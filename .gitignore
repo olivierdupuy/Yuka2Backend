@@ -1,0 +1,40 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+## NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+
+## Visual Studio
+.vs/
+*.rsuser
+*.sln.docstates
+
+## User-specific files
+*.user
+*.userosscache
+
+## OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+## Secrets
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
