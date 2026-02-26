@@ -37,6 +37,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddHostedService<SessionCleanupService>();
 builder.Services.AddHttpClient<OpenFoodFactsService>();
 
 builder.Services.AddControllers();

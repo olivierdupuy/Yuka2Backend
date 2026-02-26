@@ -45,6 +45,11 @@ public class StartSessionDto
 
     [MaxLength(50)]
     public string? AppVersion { get; set; }
+
+    /// <summary>
+    /// Optional: the session ID to close when starting a new one (sent by the mobile app).
+    /// </summary>
+    public int? PreviousSessionId { get; set; }
 }
 
 public class EndSessionDto

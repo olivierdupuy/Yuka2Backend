@@ -69,7 +69,7 @@ public class TrackingController : ControllerBase
         var userId = TryGetUserId();
         var session = await _analyticsService.StartSession(
             dto.DeviceId, dto.DeviceModel, dto.DeviceOS,
-            dto.AppVersion, userId, GetIpAddress());
+            dto.AppVersion, userId, GetIpAddress(), dto.PreviousSessionId);
 
         await _adminHub.Clients.Group("Admins").SendAsync("SessionStarted", new
         {

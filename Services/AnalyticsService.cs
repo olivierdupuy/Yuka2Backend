@@ -17,8 +17,27 @@ public class AnalyticsService
     // ==================== Tracking Methods ====================
 
     public async Task<AppSession> StartSession(string deviceId, string? deviceModel, string? deviceOS,
-        string? appVersion, int? userId, string? ipAddress)
+        string? appVersion, int? userId, string? ipAddress, int? previousSessionId = null)
     {
+        // Close any existing active sessions for this device to prevent zombie sessions
+        var activeSessions = await _context.AppSessions
+            .Where(s => s.DeviceId == deviceId && s.EndedAt == null)
+            .ToListAsync();
+
+        foreach (var active in activeSessions)
+        {
+            active.EndedAt = DateTime.UtcNow;
+        }
+
+        // Also close the explicitly provided previous session (in case deviceId differs)
+        if (previousSessionId.HasValue)
+        {
+            var prev = await _context.AppSessions
+                .FirstOrDefaultAsync(s => s.Id == previousSessionId.Value && s.EndedAt == null);
+            if (prev != null)
+                prev.EndedAt = DateTime.UtcNow;
+        }
+
         var session = new AppSession
         {
             UserId = userId,
