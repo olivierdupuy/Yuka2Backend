@@ -95,6 +95,24 @@ using (var scope = app.Services.CreateScope())
         });
         db.SaveChanges();
     }
+
+    // Seed default app config if none exists
+    if (!db.AppConfigs.Any())
+    {
+        db.AppConfigs.Add(new AppConfig
+        {
+            MaintenanceMode = false,
+            MinAppVersion = "1.0.0",
+            LatestAppVersion = "1.0.0",
+            SessionTimeoutMinutes = 30,
+            ScanEnabled = true,
+            SearchEnabled = true,
+            FavoritesEnabled = true,
+            RegistrationEnabled = true,
+            UpdatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+    }
 }
 
 app.UseSwagger();

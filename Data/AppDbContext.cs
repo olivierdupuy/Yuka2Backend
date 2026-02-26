@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<AnalyticsEvent> AnalyticsEvents => Set<AnalyticsEvent>();
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
     public DbSet<ApiLog> ApiLogs => Set<ApiLog>();
+    public DbSet<AppConfig> AppConfigs => Set<AppConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

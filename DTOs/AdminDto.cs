@@ -336,6 +336,54 @@ public class TopSearchQueryDto
     public int Count { get; set; }
 }
 
+// --- App Config DTOs ---
+
+public class AppConfigDto
+{
+    public bool MaintenanceMode { get; set; }
+    public string? MaintenanceMessage { get; set; }
+    public string? MinAppVersion { get; set; }
+    public string? LatestAppVersion { get; set; }
+    public string? ForceUpdateMessage { get; set; }
+    public int SessionTimeoutMinutes { get; set; }
+    public bool ScanEnabled { get; set; }
+    public bool SearchEnabled { get; set; }
+    public bool FavoritesEnabled { get; set; }
+    public bool RegistrationEnabled { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class UpdateAppConfigDto
+{
+    public bool MaintenanceMode { get; set; }
+
+    [MaxLength(500)]
+    public string? MaintenanceMessage { get; set; }
+
+    [MaxLength(20)]
+    public string? MinAppVersion { get; set; }
+
+    [MaxLength(20)]
+    public string? LatestAppVersion { get; set; }
+
+    [MaxLength(500)]
+    public string? ForceUpdateMessage { get; set; }
+
+    [Range(1, 1440)]
+    public int SessionTimeoutMinutes { get; set; } = 30;
+
+    public bool ScanEnabled { get; set; } = true;
+    public bool SearchEnabled { get; set; } = true;
+    public bool FavoritesEnabled { get; set; } = true;
+    public bool RegistrationEnabled { get; set; } = true;
+}
+
+public class EndSessionsDto
+{
+    public int? UserId { get; set; }
+    public string? DeviceId { get; set; }
+}
+
 // --- API Log DTOs ---
 
 public class ApiLogListDto

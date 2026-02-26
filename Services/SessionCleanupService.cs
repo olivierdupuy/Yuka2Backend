@@ -4,14 +4,13 @@ using Yuka2Back.Data;
 namespace Yuka2Back.Services;
 
 /// <summary>
-/// Background service that periodically closes stale sessions (no activity for 30+ minutes).
+/// Background service that periodically closes stale sessions based on configurable timeout.
 /// </summary>
 public class SessionCleanupService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<SessionCleanupService> _logger;
     private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(10);
-    private static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(30);
 
     public SessionCleanupService(IServiceScopeFactory scopeFactory, ILogger<SessionCleanupService> logger)
     {
@@ -41,10 +40,12 @@ public class SessionCleanupService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var cutoff = DateTime.UtcNow - SessionTimeout;
+        // Read timeout from AppConfig (default 30 min if not configured)
+        var config = await context.AppConfigs.FirstOrDefaultAsync(ct);
+        var timeoutMinutes = config?.SessionTimeoutMinutes ?? 30;
+        var cutoff = DateTime.UtcNow.AddMinutes(-timeoutMinutes);
 
         // Find active sessions whose last activity is older than the timeout.
-        // "Last activity" = most recent PageView or Event, or StartedAt if none.
         var staleSessions = await context.AppSessions
             .Where(s => s.EndedAt == null)
             .Where(s =>
@@ -68,7 +69,7 @@ public class SessionCleanupService : BackgroundService
             }
 
             await context.SaveChangesAsync(ct);
-            _logger.LogInformation("Closed {Count} stale sessions", staleSessions.Count);
+            _logger.LogInformation("Closed {Count} stale sessions (timeout: {Timeout}min)", staleSessions.Count, timeoutMinutes);
         }
     }
 }
