@@ -150,6 +150,211 @@ public class AdminController : ControllerBase
         return Ok(new { message = "Product deleted." });
     }
 
+    // ==================== Reviews ====================
+
+    [HttpGet("reviews")]
+    public async Task<IActionResult> GetReviews(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? status = null)
+    {
+        var query = _context.ProductReviews
+            .Include(r => r.User)
+            .Include(r => r.Product)
+            .AsQueryable();
+
+        if (status == "approved") query = query.Where(r => r.IsApproved);
+        else if (status == "pending") query = query.Where(r => !r.IsApproved && !r.IsReported);
+        else if (status == "reported") query = query.Where(r => r.IsReported);
+
+        var total = await query.CountAsync();
+
+        var reviews = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => new AdminReviewListDto
+            {
+                Id = r.Id,
+                UserId = r.UserId,
+                Username = r.User.Username,
+                ProductId = r.ProductId,
+                ProductName = r.Product.Name,
+                Rating = r.Rating,
+                Comment = r.Comment,
+                IsApproved = r.IsApproved,
+                IsReported = r.IsReported,
+                ModerationNote = r.ModerationNote,
+                CreatedAt = r.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new PaginatedResult<AdminReviewListDto>
+        {
+            Items = reviews,
+            TotalCount = total,
+            Page = page,
+            PageSize = pageSize
+        });
+    }
+
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [HttpPut("reviews/{id}")]
+    public async Task<IActionResult> ModerateReview(int id, [FromBody] ModerateReviewDto dto)
+    {
+        var review = await _context.ProductReviews.FindAsync(id);
+        if (review == null) return NotFound(new { message = "Review not found." });
+
+        review.IsApproved = dto.IsApproved;
+        review.ModerationNote = dto.ModerationNote;
+        review.IsReported = false;
+        review.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Review moderated." });
+    }
+
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    [HttpDelete("reviews/{id}")]
+    public async Task<IActionResult> DeleteReview(int id)
+    {
+        var review = await _context.ProductReviews.FindAsync(id);
+        if (review == null) return NotFound(new { message = "Review not found." });
+
+        _context.ProductReviews.Remove(review);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Review deleted." });
+    }
+
+    [HttpGet("reviews/stats")]
+    public async Task<IActionResult> GetReviewStats()
+    {
+        var reviews = await _context.ProductReviews.Include(r => r.Product).ToListAsync();
+        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+
+        var stats = new ReviewStatsDto
+        {
+            TotalReviews = reviews.Count,
+            ApprovedReviews = reviews.Count(r => r.IsApproved),
+            PendingReviews = reviews.Count(r => !r.IsApproved && !r.IsReported),
+            ReportedReviews = reviews.Count(r => r.IsReported),
+            AverageRating = reviews.Count > 0 ? reviews.Average(r => r.Rating) : 0,
+            RatingDistribution = Enumerable.Range(1, 5).ToDictionary(i => i, i => reviews.Count(r => r.Rating == i)),
+            MostReviewedProducts = reviews
+                .GroupBy(r => r.ProductId)
+                .Select(g => new MostReviewedProductDto
+                {
+                    ProductId = g.Key,
+                    ProductName = g.First().Product.Name,
+                    ReviewCount = g.Count(),
+                    AverageRating = g.Average(r => r.Rating)
+                })
+                .OrderByDescending(x => x.ReviewCount)
+                .Take(10)
+                .ToList(),
+            ReviewsPerDay = reviews
+                .Where(r => r.CreatedAt >= thirtyDaysAgo)
+                .GroupBy(r => r.CreatedAt.Date)
+                .Select(g => new DailyReviewDto { Date = g.Key, Count = g.Count() })
+                .OrderBy(x => x.Date)
+                .ToList()
+        };
+
+        return Ok(stats);
+    }
+
+    [HttpGet("comparisons/stats")]
+    public async Task<IActionResult> GetComparisonStats()
+    {
+        var comparisons = await _context.ProductComparisons.ToListAsync();
+        var today = DateTime.UtcNow.Date;
+        var weekAgo = today.AddDays(-7);
+
+        var allProductIds = comparisons
+            .SelectMany(c => c.ProductIds.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            .Where(id => int.TryParse(id, out _))
+            .Select(int.Parse)
+            .ToList();
+
+        var productNames = await _context.Products
+            .Where(p => allProductIds.Distinct().Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+        var stats = new ComparisonStatsDto
+        {
+            TotalComparisons = comparisons.Count,
+            ComparisonsToday = comparisons.Count(c => c.CreatedAt.Date == today),
+            ComparisonsThisWeek = comparisons.Count(c => c.CreatedAt >= weekAgo),
+            AvgProductsPerComparison = comparisons.Count > 0
+                ? comparisons.Average(c => c.ProductIds.Split(',').Length)
+                : 0,
+            MostComparedProducts = allProductIds
+                .GroupBy(id => id)
+                .Select(g => new MostComparedProductDto
+                {
+                    ProductId = g.Key,
+                    ProductName = productNames.GetValueOrDefault(g.Key, "Unknown"),
+                    CompareCount = g.Count()
+                })
+                .OrderByDescending(x => x.CompareCount)
+                .Take(10)
+                .ToList()
+        };
+
+        return Ok(stats);
+    }
+
+    [HttpGet("shopping-lists/stats")]
+    public async Task<IActionResult> GetShoppingListStats()
+    {
+        var lists = await _context.ShoppingLists.Include(sl => sl.Items).ToListAsync();
+
+        var stats = new ShoppingListStatsDto
+        {
+            TotalLists = lists.Count,
+            ActiveLists = lists.Count(sl => !sl.IsArchived),
+            ArchivedLists = lists.Count(sl => sl.IsArchived),
+            TotalItems = lists.Sum(sl => sl.Items.Count),
+            CheckedItems = lists.Sum(sl => sl.Items.Count(i => i.IsChecked)),
+            AvgItemsPerList = lists.Count > 0 ? lists.Average(sl => sl.Items.Count) : 0
+        };
+
+        return Ok(stats);
+    }
+
+    [HttpGet("allergen-alerts/stats")]
+    public async Task<IActionResult> GetAllergenAlertStats()
+    {
+        var alerts = await _context.AllergenAlerts.Include(a => a.Product).ToListAsync();
+        var today = DateTime.UtcNow.Date;
+        var weekAgo = today.AddDays(-7);
+
+        var stats = new AllergenAlertStatsDto
+        {
+            TotalAlerts = alerts.Count,
+            AlertsToday = alerts.Count(a => a.CreatedAt.Date == today),
+            AlertsThisWeek = alerts.Count(a => a.CreatedAt >= weekAgo),
+            AllergenDistribution = alerts
+                .SelectMany(a => a.MatchedAllergens.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .GroupBy(a => a)
+                .ToDictionary(g => g.Key, g => g.Count()),
+            MostAlertedProducts = alerts
+                .GroupBy(a => a.ProductId)
+                .Select(g => new MostAlertedProductDto
+                {
+                    ProductId = g.Key,
+                    ProductName = g.First().Product.Name,
+                    AlertCount = g.Count()
+                })
+                .OrderByDescending(x => x.AlertCount)
+                .Take(10)
+                .ToList()
+        };
+
+        return Ok(stats);
+    }
+
     // ==================== Sessions ====================
 
     [HttpGet("sessions")]

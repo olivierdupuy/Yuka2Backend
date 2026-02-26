@@ -64,4 +64,8 @@ public class User
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<ScanHistory> ScanHistories { get; set; } = new List<ScanHistory>();
     public ICollection<FavoriteProduct> FavoriteProducts { get; set; } = new List<FavoriteProduct>();
+    public ICollection<ProductReview> ProductReviews { get; set; } = new List<ProductReview>();
+    public ICollection<ShoppingList> ShoppingLists { get; set; } = new List<ShoppingList>();
+    public ICollection<ProductComparison> ProductComparisons { get; set; } = new List<ProductComparison>();
+    public ICollection<AllergenAlert> AllergenAlerts { get; set; } = new List<AllergenAlert>();
 }

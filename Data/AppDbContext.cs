@@ -13,6 +13,13 @@ public class AppDbContext : DbContext
     public DbSet<ScanHistory> ScanHistories => Set<ScanHistory>();
     public DbSet<FavoriteProduct> FavoriteProducts => Set<FavoriteProduct>();
 
+    // New features
+    public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+    public DbSet<ShoppingList> ShoppingLists => Set<ShoppingList>();
+    public DbSet<ShoppingListItem> ShoppingListItems => Set<ShoppingListItem>();
+    public DbSet<ProductComparison> ProductComparisons => Set<ProductComparison>();
+    public DbSet<AllergenAlert> AllergenAlerts => Set<AllergenAlert>();
+
     // Analytics
     public DbSet<AppSession> AppSessions => Set<AppSession>();
     public DbSet<PageView> PageViews => Set<PageView>();
@@ -72,6 +79,74 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<FavoriteProduct>()
             .HasIndex(f => new { f.UserId, f.ProductId })
             .IsUnique();
+
+        // --- New features configurations ---
+
+        // ProductReview
+        modelBuilder.Entity<ProductReview>()
+            .HasOne(r => r.User)
+            .WithMany(u => u.ProductReviews)
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProductReview>()
+            .HasOne(r => r.Product)
+            .WithMany(p => p.ProductReviews)
+            .HasForeignKey(r => r.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProductReview>()
+            .HasIndex(r => new { r.UserId, r.ProductId })
+            .IsUnique();
+
+        modelBuilder.Entity<ProductReview>()
+            .HasIndex(r => r.CreatedAt);
+
+        // ShoppingList
+        modelBuilder.Entity<ShoppingList>()
+            .HasOne(sl => sl.User)
+            .WithMany(u => u.ShoppingLists)
+            .HasForeignKey(sl => sl.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ShoppingList>()
+            .HasIndex(sl => sl.UserId);
+
+        // ShoppingListItem
+        modelBuilder.Entity<ShoppingListItem>()
+            .HasOne(sli => sli.ShoppingList)
+            .WithMany(sl => sl.Items)
+            .HasForeignKey(sli => sli.ShoppingListId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ShoppingListItem>()
+            .HasOne(sli => sli.Product)
+            .WithMany()
+            .HasForeignKey(sli => sli.ProductId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // ProductComparison
+        modelBuilder.Entity<ProductComparison>()
+            .HasOne(pc => pc.User)
+            .WithMany(u => u.ProductComparisons)
+            .HasForeignKey(pc => pc.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ProductComparison>()
+            .HasIndex(pc => pc.CreatedAt);
+
+        // AllergenAlert
+        modelBuilder.Entity<AllergenAlert>()
+            .HasOne(aa => aa.User)
+            .WithMany(u => u.AllergenAlerts)
+            .HasForeignKey(aa => aa.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AllergenAlert>()
+            .HasIndex(aa => aa.UserId);
+
+        modelBuilder.Entity<AllergenAlert>()
+            .HasIndex(aa => aa.CreatedAt);
 
         // --- Analytics configurations ---
 

@@ -60,4 +60,5 @@ public class Product
 
     public ICollection<ScanHistory> ScanHistories { get; set; } = new List<ScanHistory>();
     public ICollection<FavoriteProduct> FavoriteProducts { get; set; } = new List<FavoriteProduct>();
+    public ICollection<ProductReview> ProductReviews { get; set; } = new List<ProductReview>();
 }

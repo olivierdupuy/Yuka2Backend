@@ -300,6 +300,95 @@ public class ProductsController : ControllerBase
         return Ok(favorites);
     }
 
+    [Authorize]
+    [HttpPost("compare")]
+    public async Task<ActionResult<CompareResultDto>> CompareProducts([FromBody] CompareRequestDto dto)
+    {
+        if (dto.ProductIds.Count < 2 || dto.ProductIds.Count > 4)
+            return BadRequest(new { message = "Sélectionnez entre 2 et 4 produits" });
+
+        var products = await _context.Products
+            .Where(p => dto.ProductIds.Contains(p.Id))
+            .ToListAsync();
+
+        if (products.Count != dto.ProductIds.Count)
+            return BadRequest(new { message = "Un ou plusieurs produits introuvables" });
+
+        // Log comparison
+        int? userId = null;
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim != null) userId = int.Parse(userIdClaim);
+
+        _context.ProductComparisons.Add(new ProductComparison
+        {
+            UserId = userId,
+            ProductIds = string.Join(",", dto.ProductIds)
+        });
+        await _context.SaveChangesAsync();
+
+        var productDtos = products.Select(MapToDto).ToList();
+
+        var result = new CompareResultDto
+        {
+            Products = productDtos,
+            BestHealthScoreProductId = products
+                .Where(p => p.HealthScore.HasValue)
+                .OrderByDescending(p => p.HealthScore)
+                .FirstOrDefault()?.Id,
+            BestNutriScoreProductId = products
+                .Where(p => p.NutriScore != null)
+                .OrderBy(p => p.NutriScore)
+                .FirstOrDefault()?.Id
+        };
+
+        return Ok(result);
+    }
+
+    [Authorize]
+    [HttpGet("allergen-check/{productId}")]
+    public async Task<ActionResult<AllergenCheckResultDto>> CheckAllergens(int productId)
+    {
+        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return NotFound(new { message = "Utilisateur non trouvé" });
+
+        var product = await _context.Products.FindAsync(productId);
+        if (product == null) return NotFound(new { message = "Produit non trouvé" });
+
+        var userAllergens = string.IsNullOrWhiteSpace(user.Allergies)
+            ? new List<string>()
+            : user.Allergies.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        var productAllergens = string.IsNullOrWhiteSpace(product.Allergens)
+            ? new List<string>()
+            : product.Allergens.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+        var matched = userAllergens
+            .Where(ua => productAllergens.Any(pa => pa.Contains(ua, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        if (matched.Count > 0)
+        {
+            _context.AllergenAlerts.Add(new AllergenAlert
+            {
+                UserId = userId,
+                ProductId = productId,
+                MatchedAllergens = string.Join(",", matched)
+            });
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok(new AllergenCheckResultDto
+        {
+            ProductId = productId,
+            ProductName = product.Name,
+            ProductAllergens = productAllergens,
+            UserAllergens = userAllergens,
+            MatchedAllergens = matched,
+            HasAlert = matched.Count > 0
+        });
+    }
+
     private static ProductDto MapToDto(Product p) => new()
     {
         Id = p.Id,
