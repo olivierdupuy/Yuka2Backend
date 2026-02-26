@@ -51,9 +51,10 @@ public class AdminController : ControllerBase
         [FromQuery] int pageSize = 20,
         [FromQuery] string? search = null,
         [FromQuery] string? sortBy = null,
-        [FromQuery] bool sortDesc = true)
+        [FromQuery] bool sortDesc = true,
+        [FromQuery] string? status = null)
     {
-        var result = await _analyticsService.GetUsers(page, pageSize, search, sortBy, sortDesc);
+        var result = await _analyticsService.GetUsers(page, pageSize, search, sortBy, sortDesc, status);
         return Ok(result);
     }
 
@@ -250,6 +251,11 @@ public class AdminController : ControllerBase
             SearchEnabled = config.SearchEnabled,
             FavoritesEnabled = config.FavoritesEnabled,
             RegistrationEnabled = config.RegistrationEnabled,
+            HistoryEnabled = config.HistoryEnabled,
+            OpenFoodFactsEnabled = config.OpenFoodFactsEnabled,
+            BiometricAuthEnabled = config.BiometricAuthEnabled,
+            AccountDeletionEnabled = config.AccountDeletionEnabled,
+            PasswordResetEnabled = config.PasswordResetEnabled,
             UpdatedAt = config.UpdatedAt
         });
     }
@@ -275,6 +281,11 @@ public class AdminController : ControllerBase
         config.SearchEnabled = dto.SearchEnabled;
         config.FavoritesEnabled = dto.FavoritesEnabled;
         config.RegistrationEnabled = dto.RegistrationEnabled;
+        config.HistoryEnabled = dto.HistoryEnabled;
+        config.OpenFoodFactsEnabled = dto.OpenFoodFactsEnabled;
+        config.BiometricAuthEnabled = dto.BiometricAuthEnabled;
+        config.AccountDeletionEnabled = dto.AccountDeletionEnabled;
+        config.PasswordResetEnabled = dto.PasswordResetEnabled;
         config.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -350,5 +361,40 @@ public class AdminController : ControllerBase
     {
         var result = await _analyticsService.GetApiLogs(page, pageSize, from, to, method, path, statusCode);
         return Ok(result);
+    }
+
+    [HttpGet("analytics/summary")]
+    public async Task<IActionResult> GetAnalyticsSummary()
+    {
+        var data = await _analyticsService.GetAnalyticsSummary();
+        return Ok(data);
+    }
+
+    [HttpGet("analytics/trends")]
+    public async Task<IActionResult> GetEventTrends([FromQuery] int days = 30)
+    {
+        var data = await _analyticsService.GetEventTrends(days);
+        return Ok(data);
+    }
+
+    [HttpGet("analytics/user-growth")]
+    public async Task<IActionResult> GetUserGrowth([FromQuery] int days = 30)
+    {
+        var data = await _analyticsService.GetUserGrowth(days);
+        return Ok(data);
+    }
+
+    [HttpGet("analytics/peak-hours")]
+    public async Task<IActionResult> GetPeakHours()
+    {
+        var data = await _analyticsService.GetPeakHours();
+        return Ok(data);
+    }
+
+    [HttpGet("analytics/funnel")]
+    public async Task<IActionResult> GetFunnel()
+    {
+        var data = await _analyticsService.GetFunnelStats();
+        return Ok(data);
     }
 }

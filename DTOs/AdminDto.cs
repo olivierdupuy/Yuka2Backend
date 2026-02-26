@@ -155,16 +155,40 @@ public class AdminUserListDto
     public DateTime? LastLoginAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public bool IsActive { get; set; }
+    public bool IsEmailVerified { get; set; }
 }
 
 public class AdminUserDetailDto : AdminUserListDto
 {
+    public string? Phone { get; set; }
+    public DateTime? DateOfBirth { get; set; }
     public string? DietType { get; set; }
     public string? Allergies { get; set; }
+    public string? DietaryGoals { get; set; }
+    public bool NotificationsEnabled { get; set; }
+    public bool DarkModeEnabled { get; set; }
+    public string Language { get; set; } = "fr";
+    public int FailedLoginAttempts { get; set; }
+    public DateTime? LockoutEnd { get; set; }
     public int TotalFavorites { get; set; }
     public int TotalSessions { get; set; }
     public int TotalEvents { get; set; }
+    public int ScansThisWeek { get; set; }
+    public int ScansThisMonth { get; set; }
     public List<RecentActivityDto> RecentActivity { get; set; } = new();
+    public List<UserSessionDto> RecentSessions { get; set; } = new();
+}
+
+public class UserSessionDto
+{
+    public int Id { get; set; }
+    public string? DeviceModel { get; set; }
+    public string? DeviceOS { get; set; }
+    public string? AppVersion { get; set; }
+    public string? IpAddress { get; set; }
+    public DateTime StartedAt { get; set; }
+    public DateTime? EndedAt { get; set; }
+    public bool IsActive { get; set; }
 }
 
 public class RecentActivityDto
@@ -336,6 +360,65 @@ public class TopSearchQueryDto
     public int Count { get; set; }
 }
 
+// --- Analytics Summary ---
+
+public class AnalyticsSummaryDto
+{
+    public int TotalEvents { get; set; }
+    public int TotalPageViews { get; set; }
+    public int TotalSessions { get; set; }
+    public int TotalSearches { get; set; }
+    public int EventsToday { get; set; }
+    public int PageViewsToday { get; set; }
+    public int NewUsersToday { get; set; }
+    public int NewUsersThisWeek { get; set; }
+    public int NewUsersThisMonth { get; set; }
+    public double AvgEventsPerUser { get; set; }
+    public double AvgSessionDuration { get; set; }
+}
+
+public class EventTrendDto
+{
+    public DateTime Date { get; set; }
+    public string EventType { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+
+public class EventTrendsResponseDto
+{
+    public List<EventTrendDto> Trends { get; set; } = new();
+    public List<string> EventTypes { get; set; } = new();
+    public List<DailyCountDto> DailyTotals { get; set; } = new();
+}
+
+public class UserGrowthDto
+{
+    public List<DailyCountDto> DailyRegistrations { get; set; } = new();
+    public int TotalNewUsers { get; set; }
+    public double AvgPerDay { get; set; }
+}
+
+public class PeakHoursDto
+{
+    public List<HourlyDayDto> Data { get; set; } = new();
+}
+
+public class HourlyDayDto
+{
+    public int DayOfWeek { get; set; }
+    public int Hour { get; set; }
+    public int Count { get; set; }
+}
+
+public class FunnelStatsDto
+{
+    public int TotalUsers { get; set; }
+    public int UsersWithSessions { get; set; }
+    public int UsersWithScans { get; set; }
+    public int UsersWithFavorites { get; set; }
+    public int UsersWithSearches { get; set; }
+}
+
 // --- App Config DTOs ---
 
 public class AppConfigDto
@@ -350,6 +433,11 @@ public class AppConfigDto
     public bool SearchEnabled { get; set; }
     public bool FavoritesEnabled { get; set; }
     public bool RegistrationEnabled { get; set; }
+    public bool HistoryEnabled { get; set; }
+    public bool OpenFoodFactsEnabled { get; set; }
+    public bool BiometricAuthEnabled { get; set; }
+    public bool AccountDeletionEnabled { get; set; }
+    public bool PasswordResetEnabled { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
 
@@ -376,6 +464,11 @@ public class UpdateAppConfigDto
     public bool SearchEnabled { get; set; } = true;
     public bool FavoritesEnabled { get; set; } = true;
     public bool RegistrationEnabled { get; set; } = true;
+    public bool HistoryEnabled { get; set; } = true;
+    public bool OpenFoodFactsEnabled { get; set; } = true;
+    public bool BiometricAuthEnabled { get; set; } = true;
+    public bool AccountDeletionEnabled { get; set; } = true;
+    public bool PasswordResetEnabled { get; set; } = true;
 }
 
 public class EndSessionsDto

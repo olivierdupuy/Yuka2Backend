@@ -31,7 +31,12 @@ public class ConfigController : ControllerBase
                 scanEnabled = true,
                 searchEnabled = true,
                 favoritesEnabled = true,
-                registrationEnabled = true
+                registrationEnabled = true,
+                historyEnabled = true,
+                openFoodFactsEnabled = true,
+                biometricAuthEnabled = true,
+                accountDeletionEnabled = true,
+                passwordResetEnabled = true
             });
 
         return Ok(new
@@ -44,7 +49,12 @@ public class ConfigController : ControllerBase
             scanEnabled = config.ScanEnabled,
             searchEnabled = config.SearchEnabled,
             favoritesEnabled = config.FavoritesEnabled,
-            registrationEnabled = config.RegistrationEnabled
+            registrationEnabled = config.RegistrationEnabled,
+            historyEnabled = config.HistoryEnabled,
+            openFoodFactsEnabled = config.OpenFoodFactsEnabled,
+            biometricAuthEnabled = config.BiometricAuthEnabled,
+            accountDeletionEnabled = config.AccountDeletionEnabled,
+            passwordResetEnabled = config.PasswordResetEnabled
         });
     }
 }

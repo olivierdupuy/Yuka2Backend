@@ -451,6 +451,16 @@ public class AnalyticsService
         var totalSessions = await _context.AppSessions.CountAsync(s => s.UserId == userId);
         var totalEvents = await _context.AnalyticsEvents.CountAsync(e => e.UserId == userId);
 
+        var now = DateTime.UtcNow;
+        var startOfWeek = now.AddDays(-(int)now.DayOfWeek).Date;
+        var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var scansThisWeek = await _context.ScanHistories
+            .CountAsync(s => s.UserId == userId && s.ScannedAt >= startOfWeek);
+
+        var scansThisMonth = await _context.ScanHistories
+            .CountAsync(s => s.UserId == userId && s.ScannedAt >= startOfMonth);
+
         var recentActivity = await _context.AnalyticsEvents
             .Where(e => e.UserId == userId)
             .OrderByDescending(e => e.CreatedAt)
@@ -463,6 +473,23 @@ public class AnalyticsService
             })
             .ToListAsync();
 
+        var recentSessions = await _context.AppSessions
+            .Where(s => s.UserId == userId)
+            .OrderByDescending(s => s.StartedAt)
+            .Take(10)
+            .Select(s => new UserSessionDto
+            {
+                Id = s.Id,
+                DeviceModel = s.DeviceModel,
+                DeviceOS = s.DeviceOS,
+                AppVersion = s.AppVersion,
+                IpAddress = s.IpAddress,
+                StartedAt = s.StartedAt,
+                EndedAt = s.EndedAt,
+                IsActive = s.EndedAt == null
+            })
+            .ToListAsync();
+
         return new AdminUserDetailDto
         {
             Id = user.Id,
@@ -470,16 +497,28 @@ public class AnalyticsService
             Email = user.Email,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            Phone = user.Phone,
+            DateOfBirth = user.DateOfBirth,
+            DietType = user.DietType,
+            Allergies = user.Allergies,
+            DietaryGoals = user.DietaryGoals,
+            NotificationsEnabled = user.NotificationsEnabled,
+            DarkModeEnabled = user.DarkModeEnabled,
+            Language = user.Language,
+            FailedLoginAttempts = user.FailedLoginAttempts,
+            LockoutEnd = user.LockoutEnd,
             TotalScans = user.TotalScans,
             LastLoginAt = user.LastLoginAt,
             CreatedAt = user.CreatedAt,
             IsActive = user.LockoutEnd == null || user.LockoutEnd < DateTime.UtcNow,
-            DietType = user.DietType,
-            Allergies = user.Allergies,
+            IsEmailVerified = user.IsEmailVerified,
             TotalFavorites = totalFavorites,
             TotalSessions = totalSessions,
             TotalEvents = totalEvents,
-            RecentActivity = recentActivity
+            ScansThisWeek = scansThisWeek,
+            ScansThisMonth = scansThisMonth,
+            RecentActivity = recentActivity,
+            RecentSessions = recentSessions
         };
     }
 
@@ -742,7 +781,7 @@ public class AnalyticsService
     // ==================== Admin User Management Helpers ====================
 
     public async Task<PaginatedResult<AdminUserListDto>> GetUsers(
-        int page, int pageSize, string? search, string? sortBy, bool sortDesc)
+        int page, int pageSize, string? search, string? sortBy, bool sortDesc, string? status = null)
     {
         var query = _context.Users.AsQueryable();
 
@@ -753,6 +792,26 @@ public class AnalyticsService
                 u.Email.Contains(search) ||
                 (u.FirstName != null && u.FirstName.Contains(search)) ||
                 (u.LastName != null && u.LastName.Contains(search)));
+        }
+
+        // Status filter
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            switch (status.ToLower())
+            {
+                case "active":
+                    query = query.Where(u => u.LockoutEnd == null || u.LockoutEnd < DateTime.UtcNow);
+                    break;
+                case "inactive":
+                    query = query.Where(u => u.LockoutEnd != null && u.LockoutEnd >= DateTime.UtcNow);
+                    break;
+                case "verified":
+                    query = query.Where(u => u.IsEmailVerified);
+                    break;
+                case "unverified":
+                    query = query.Where(u => !u.IsEmailVerified);
+                    break;
+            }
         }
 
         var totalCount = await query.CountAsync();
@@ -781,7 +840,8 @@ public class AnalyticsService
                 TotalScans = u.TotalScans,
                 LastLoginAt = u.LastLoginAt,
                 CreatedAt = u.CreatedAt,
-                IsActive = u.LockoutEnd == null || u.LockoutEnd < DateTime.UtcNow
+                IsActive = u.LockoutEnd == null || u.LockoutEnd < DateTime.UtcNow,
+                IsEmailVerified = u.IsEmailVerified
             })
             .ToListAsync();
 
@@ -833,6 +893,168 @@ public class AnalyticsService
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize
+        };
+    }
+
+    // ==================== Analytics Summary ====================
+
+    public async Task<AnalyticsSummaryDto> GetAnalyticsSummary()
+    {
+        var now = DateTime.UtcNow;
+        var today = now.Date;
+        var weekAgo = now.AddDays(-7);
+        var monthAgo = now.AddDays(-30);
+
+        var totalEvents = await _context.AnalyticsEvents.CountAsync();
+        var totalPageViews = await _context.PageViews.CountAsync();
+        var totalSessions = await _context.AppSessions.CountAsync();
+        var totalSearches = await _context.AnalyticsEvents.CountAsync(e => e.EventType == "search");
+        var eventsToday = await _context.AnalyticsEvents.CountAsync(e => e.CreatedAt >= today);
+        var pageViewsToday = await _context.PageViews.CountAsync(pv => pv.EnteredAt >= today);
+        var newUsersToday = await _context.Users.CountAsync(u => u.CreatedAt >= today);
+        var newUsersWeek = await _context.Users.CountAsync(u => u.CreatedAt >= weekAgo);
+        var newUsersMonth = await _context.Users.CountAsync(u => u.CreatedAt >= monthAgo);
+
+        var totalUsers = await _context.Users.CountAsync();
+        var avgEventsPerUser = totalUsers > 0 ? Math.Round((double)totalEvents / totalUsers, 1) : 0;
+
+        var avgDuration = await _context.AppSessions
+            .Where(s => s.EndedAt != null)
+            .AverageAsync(s => (double?)EF.Functions.DateDiffSecond(s.StartedAt, s.EndedAt!.Value)) ?? 0;
+
+        return new AnalyticsSummaryDto
+        {
+            TotalEvents = totalEvents,
+            TotalPageViews = totalPageViews,
+            TotalSessions = totalSessions,
+            TotalSearches = totalSearches,
+            EventsToday = eventsToday,
+            PageViewsToday = pageViewsToday,
+            NewUsersToday = newUsersToday,
+            NewUsersThisWeek = newUsersWeek,
+            NewUsersThisMonth = newUsersMonth,
+            AvgEventsPerUser = avgEventsPerUser,
+            AvgSessionDuration = avgDuration
+        };
+    }
+
+    // ==================== Event Trends ====================
+
+    public async Task<EventTrendsResponseDto> GetEventTrends(int days)
+    {
+        var since = DateTime.UtcNow.AddDays(-days).Date;
+
+        var trends = await _context.AnalyticsEvents
+            .Where(e => e.CreatedAt >= since)
+            .GroupBy(e => new { Date = e.CreatedAt.Date, e.EventType })
+            .Select(g => new EventTrendDto
+            {
+                Date = g.Key.Date,
+                EventType = g.Key.EventType,
+                Count = g.Count()
+            })
+            .OrderBy(t => t.Date)
+            .ToListAsync();
+
+        var eventTypes = trends.Select(t => t.EventType).Distinct().OrderBy(t => t).ToList();
+
+        var dailyTotals = trends
+            .GroupBy(t => t.Date)
+            .Select(g => new DailyCountDto { Date = g.Key, Count = g.Sum(t => t.Count) })
+            .OrderBy(d => d.Date)
+            .ToList();
+
+        return new EventTrendsResponseDto
+        {
+            Trends = trends,
+            EventTypes = eventTypes,
+            DailyTotals = dailyTotals
+        };
+    }
+
+    // ==================== User Growth ====================
+
+    public async Task<UserGrowthDto> GetUserGrowth(int days)
+    {
+        var since = DateTime.UtcNow.AddDays(-days).Date;
+
+        var dailyRegs = await _context.Users
+            .Where(u => u.CreatedAt >= since)
+            .GroupBy(u => u.CreatedAt.Date)
+            .Select(g => new DailyCountDto
+            {
+                Date = g.Key,
+                Count = g.Count()
+            })
+            .OrderBy(d => d.Date)
+            .ToListAsync();
+
+        var totalNew = dailyRegs.Sum(d => d.Count);
+        var avgPerDay = days > 0 ? Math.Round((double)totalNew / days, 1) : 0;
+
+        return new UserGrowthDto
+        {
+            DailyRegistrations = dailyRegs,
+            TotalNewUsers = totalNew,
+            AvgPerDay = avgPerDay
+        };
+    }
+
+    // ==================== Peak Hours ====================
+
+    public async Task<PeakHoursDto> GetPeakHours()
+    {
+        var twoWeeksAgo = DateTime.UtcNow.AddDays(-14);
+
+        var data = await _context.AnalyticsEvents
+            .Where(e => e.CreatedAt >= twoWeeksAgo)
+            .GroupBy(e => new { DayOfWeek = (int)e.CreatedAt.DayOfWeek, Hour = e.CreatedAt.Hour })
+            .Select(g => new HourlyDayDto
+            {
+                DayOfWeek = g.Key.DayOfWeek,
+                Hour = g.Key.Hour,
+                Count = g.Count()
+            })
+            .ToListAsync();
+
+        return new PeakHoursDto { Data = data };
+    }
+
+    // ==================== Funnel ====================
+
+    public async Task<FunnelStatsDto> GetFunnelStats()
+    {
+        var totalUsers = await _context.Users.CountAsync();
+
+        var usersWithSessions = await _context.AppSessions
+            .Where(s => s.UserId != null)
+            .Select(s => s.UserId)
+            .Distinct()
+            .CountAsync();
+
+        var usersWithScans = await _context.ScanHistories
+            .Select(s => s.UserId)
+            .Distinct()
+            .CountAsync();
+
+        var usersWithFavorites = await _context.FavoriteProducts
+            .Select(f => f.UserId)
+            .Distinct()
+            .CountAsync();
+
+        var usersWithSearches = await _context.AnalyticsEvents
+            .Where(e => e.EventType == "search" && e.UserId != null)
+            .Select(e => e.UserId)
+            .Distinct()
+            .CountAsync();
+
+        return new FunnelStatsDto
+        {
+            TotalUsers = totalUsers,
+            UsersWithSessions = usersWithSessions,
+            UsersWithScans = usersWithScans,
+            UsersWithFavorites = usersWithFavorites,
+            UsersWithSearches = usersWithSearches
         };
     }
 }

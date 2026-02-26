@@ -33,6 +33,11 @@ public class AppConfig
     public bool SearchEnabled { get; set; } = true;
     public bool FavoritesEnabled { get; set; } = true;
     public bool RegistrationEnabled { get; set; } = true;
+    public bool HistoryEnabled { get; set; } = true;
+    public bool OpenFoodFactsEnabled { get; set; } = true;
+    public bool BiometricAuthEnabled { get; set; } = true;
+    public bool AccountDeletionEnabled { get; set; } = true;
+    public bool PasswordResetEnabled { get; set; } = true;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
